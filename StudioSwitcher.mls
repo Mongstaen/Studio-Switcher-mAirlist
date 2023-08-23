@@ -1,0 +1,134 @@
+//////////////////////////////////
+// Studio Switcher Script V2.0 ///
+// Written by Thomas Mongstad  ///
+//////////////////////////////////
+
+const  
+    DEBUG = True;    // Set to false in production
+    LOGGING = True;
+
+var
+    i: integer;
+    GO_ON_AIR: boolean;
+    GO_OFF_AIR: boolean;
+    STUDIO_ON_AIR_STATUS: boolean;
+
+// Custom procedures
+procedure WriteLog(message: String);
+begin
+    if (LOGGING) then
+    begin
+        SystemLog('Studio Switcher Log: ' + message);
+    end;
+end;
+
+procedure WriteScriptDebug(message: String);
+begin
+    if (DEBUG) then
+    begin
+        SystemLog('Studio Switcher Debug: ' + message);
+    end;
+end;
+
+procedure GoOnAir;
+begin
+    if(GO_ON_AIR) then begin
+        Sleep(5000);
+        WriteLog('GO ON AIR');
+        ExecuteCommand('AUTOMATION 1 ON');
+        ExecuteCommand('ON AIR');
+        ExecuteCommand('AUTOMATION 1 PLAY');
+        GO_ON_AIR := False;
+    end;
+end;
+
+procedure GoOffAirTOTH;
+begin
+    if(GO_OFF_AIR) then begin
+        WriteLog('GO OFF AIR');
+        ExecuteCommand('AUTOMATION 1 STOP');
+        Sleep(2500);
+        StopStudio();
+        GO_OFF_AIR := False;
+    end;
+end;
+
+// If dropping Studio stop button
+procedure StopStudio;
+begin
+    ExecuteCommand('ENCODER DISCONNECT');
+    ExecuteCommand('AUTOMATION 1 OFF');
+    Sleep(2000); 
+    ExecuteCommand('PLAYLIST 1 CLEAR');
+end;
+
+// mAirlist procedures
+procedure OnLoad;
+begin
+    SystemLog('Loaded Studio Switcher Script');
+    GO_ON_AIR := False;
+end;
+
+procedure OnOnAir;
+begin
+    STUDIO_ON_AIR_STATUS := True;
+    WriteLog('Set STUDIO_ON_AIR_STATUS to true');
+end;
+
+procedure OnOffAir;
+begin
+    STUDIO_ON_AIR_STATUS := False;
+    WriteLog('Set STUDIO_ON_AIR_STATUS to false');
+end;
+
+procedure OnExecuteCommand(Command: string);
+begin
+    WriteScriptDebug(Command); 
+    
+    if Command = 'TOTH_CHECK' then begin
+        WriteScriptDebug('Running TOTH checks..');
+        GoOnAir();
+        GoOffAirTOTH();
+    end;
+
+    if Command = 'GO_ON_AIR TRUE' then begin
+        GO_ON_AIR := True;
+        GO_OFF_AIR := False;
+        WriteScriptDebug('This Studio will go live at TOTH');
+    end;
+
+    if Command = 'GO_ON_AIR FALSE' then begin
+        GO_ON_AIR := False;
+    end;
+
+    if Command = 'GO_OFF_AIR TRUE' then begin
+        WriteScriptDebug('This Studio will go off air next hour.');
+        GO_OFF_AIR := True;
+        GO_ON_AIR := False;
+    end;
+
+    if Command = 'GO_OFF_AIR FALSE' then begin
+        GO_OFF_AIR := False;
+    end;
+
+    if Command = 'DELAYED CLEAR' then begin
+        StopStudio();
+    end;
+
+    if Command = 'MESSAGE_TO_SERVER' then begin
+        ShowMessage('Server studio will go on air next hour.');
+    end;
+
+    if Command = 'MESSAGE_TO_CURRENT' then begin
+        ShowMessage('This studio will go on air next hour.');
+    end;
+
+    if Command = 'CONFIRMATION_FROM_VIRTUALSTUDIO' then begin
+        SystemLog('Confirmation from virtual studio. Going live at TOTH!');
+        ShowMessage('Melding fra server: Bekrefter on air fra neste time.');
+    end;
+
+end;
+
+begin    
+end.
