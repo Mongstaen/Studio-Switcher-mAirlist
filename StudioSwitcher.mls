@@ -53,13 +53,17 @@ begin
     end;
 end;
 
-// If dropping Studio stop button
 procedure StopStudio;
 begin
     ExecuteCommand('ENCODER DISCONNECT');
     ExecuteCommand('AUTOMATION 1 OFF');
     Sleep(2000); 
     ExecuteCommand('PLAYLIST 1 CLEAR');
+end;
+
+procedure RestToServer(Command);
+begin
+    HTTPPost('http://user:password@<IP-address>:<port>', 'command='Command);
 end;
 
 // mAirlist procedures
@@ -102,9 +106,9 @@ begin
     end;
 
     if Command = 'GO_OFF_AIR TRUE' then begin
-        WriteScriptDebug('This Studio will go off air next hour.');
         GO_OFF_AIR := True;
         GO_ON_AIR := False;
+        WriteScriptDebug('This Studio will go off air next hour.');
     end;
 
     if Command = 'GO_OFF_AIR FALSE' then begin
@@ -126,6 +130,10 @@ begin
     if Command = 'CONFIRMATION_FROM_VIRTUALSTUDIO' then begin
         SystemLog('Confirmation from virtual studio. Going live at TOTH!');
         ShowMessage('Melding fra server: Bekrefter on air fra neste time.');
+    end;
+
+    if Command = 'TEST_REST' then begin
+        RestToServer('COMMAND HER')
     end;
 
 end;
