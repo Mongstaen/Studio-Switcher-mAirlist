@@ -7,6 +7,10 @@ const
     DEBUG = True;    // Set to false in production
     LOGGING = True;
 
+    // NTFY Logging
+    LOG_SEARCH_PHRASE = 'Studio Switcher Log:';
+    NTFY_ENDPOINT = '10.0.8.149/Test-mAirlist-Logs';
+
     // Your serverstudio/virtual studio
     SERVER_STUDIO_IP = '127.0.0.1:9300'; // Change to your IP and port
     SERVER_STUDIO_USER = 'thomas';
@@ -25,6 +29,7 @@ var
 
     sl: TStringList;
     STUDIO: string;
+
 
 // Custom procedures
 procedure WriteLog(message: String);
@@ -122,13 +127,13 @@ end;
 procedure OnOnAir;
 begin
     STUDIO_ON_AIR_STATUS := True;
-    WriteLog('Set STUDIO_ON_AIR_STATUS to true');
+    WriteScriptDebug('Set STUDIO_ON_AIR_STATUS to true');
 end;
 
 procedure OnOffAir;
 begin
     STUDIO_ON_AIR_STATUS := False;
-    WriteLog('Set STUDIO_ON_AIR_STATUS to false');
+    WriteScriptDebug('Set STUDIO_ON_AIR_STATUS to false');
 end;
 
 procedure OnExecuteCommand(Command: string);
@@ -180,6 +185,18 @@ begin
 
     if Command = 'TEST_REST' then begin
         RestToStudio1('Halloen');
+    end;
+end;
+
+procedure OnSystemLog(Category: TLogCategory; Message: string);
+begin
+    i := pos(LOG_SEARCH_PHRASE, Message);
+    if (i >= 1) then begin
+        if (NTFY_ENDPOINT = '') then begin
+            SystemLog('No NTFY endpoint set, aborting.. ');
+            exit;
+        end; 
+        ShellExecuteHidden('curl', '-d "' + Message + '" ' + NTFY_ENDPOINT);
     end;
 end;
 
