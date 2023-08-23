@@ -4,39 +4,49 @@
 //////////////////////////////////
 
 const  
-    DEBUG = True;    // Set to false in production
-    LOGGING = True;
+    DEBUG =                 False;  // Set to false in production
+    LOGGING =               True;   // Reccomending true in production
+    VIEW_ALL_COMMANDS =     False;  // Set to false in production. Logs all executed commands to SystemLog
 
-    // NTFY Logging
-    LOG_SEARCH_PHRASE = 'Studio Switcher Log:';
-    NTFY_ENDPOINT = '10.0.8.149/Test-mAirlist-Logs';
+    // NTFY Logging and Debugging
+    NTFY_LOG =              True; // True if set up, false if not.
+    LOG_SEARCH_PHRASE =     'Studio Switcher Log:';
+    NTFY_LOG_ENDPOINT =     '10.0.8.149/Test-mAirlist-Logs';
+    DEBUG_SEARCH_PHRASE =   'Studio Switcher Debug:';
+    NTFY_DEBUG_ENDPOINT =   '10.0.8.149/Test-mAirlist-Debug';
 
     // Your serverstudio/virtual studio
-    SERVER_STUDIO_IP = '127.0.0.1:9300'; // Change to your IP and port
-    SERVER_STUDIO_USER = 'thomas';
-    SERVER_STUDIO_PASSWORD = 'thomas';
+    SERVER_STUDIO_IP =      '127.0.0.1:9300'; // Change to your IP and port
+    SERVER_STUDIO_USER =    'thomas';
+    SERVER_STUDIO_PASSWORD ='thomas';
 
     // Your main studio
-    STUDIO1_IP = '127.0.0.1:9300'; // Change to your IP and port
-    STUDIO1_USER = 'thomas';
-    STUDIO1_PASSWORD = 'thomas';
+    STUDIO1_IP =            '127.0.0.1:9300'; // Change to your IP and port
+    STUDIO1_USER =          'thomas';
+    STUDIO1_PASSWORD =      'thomas';
 
 var
-    i: integer;
-    GO_ON_AIR: boolean;
-    GO_OFF_AIR: boolean;
-    STUDIO_ON_AIR_STATUS: boolean;
+    i:                      integer;
+    GO_ON_AIR:              boolean;
+    GO_OFF_AIR:             boolean;
+    STUDIO_ON_AIR_STATUS:   boolean;
 
-    sl: TStringList;
-    STUDIO: string;
-
+    sl:                     TStringList;
+    STUDIO:                 string;
 
 // Custom procedures
 procedure WriteLog(message: String);
 begin
     if (LOGGING) then
     begin
-        SystemLog('Studio Switcher Log: ' + message);
+        SystemLog(STUDIO + ' Studio Switcher Log: ' + message);
+    end;
+    if (NTFY_LOG) then
+    begin
+        if (NTFY_LOG_ENDPOINT = '') then begin
+            exit;
+        end; 
+        ShellExecuteHidden('curl', '-d "' + STUDIO + ' ' + message + '" ' + NTFY_LOG_ENDPOINT);
     end;
 end;
 
@@ -44,7 +54,22 @@ procedure WriteScriptDebug(message: String);
 begin
     if (DEBUG) then
     begin
-        SystemLog('Studio Switcher Debug: ' + message);
+        SystemLog(STUDIO + ' Studio Switcher Debug: ' + message);
+    end;
+    if (NTFY_LOG) then
+    begin
+        if (NTFY_DEBUG_ENDPOINT = '') then begin
+            exit;
+        end; 
+        ShellExecuteHidden('curl', '-d "' + STUDIO + ' ' + message + '" ' + NTFY_DEBUG_ENDPOINT);
+    end;
+end;
+
+procedure ViewAllCommands(message: String);
+begin
+    if (VIEW_ALL_COMMANDS) then
+    begin
+        SystemLog(STUDIO + ' Command Viewer: ' + message);
     end;
 end;
 
@@ -57,12 +82,12 @@ begin
     GO_ON_AIR := False;
 end;
 
-
 procedure GoOnAir;
 begin
     if(GO_ON_AIR) then begin
         Sleep(5000);
         WriteLog('GO ON AIR');
+        WriteScriptDebug('GOING ON AIR');
         ExecuteCommand('AUTOMATION 1 ON');
         ExecuteCommand('ON AIR');
         ExecuteCommand('AUTOMATION 1 PLAY');
@@ -74,6 +99,7 @@ procedure GoOffAir;
 begin
     if(GO_OFF_AIR) then begin
         WriteLog('GO OFF AIR');
+        WriteScriptDebug('GOING OFF AIR');
         ExecuteCommand('AUTOMATION 1 STOP');
         Sleep(2500);
         StopStudio();
@@ -83,19 +109,17 @@ end;
 
 procedure RestToServer(Command: String);
 begin
-    if (STUDIO = 'server') then begin
+    if (STUDIO = 'SERVER') then begin
         WriteScriptDebug('Server studio trying to send REST command to itself. Aborting..');
         exit;
     end;
 
     HTTPPost('http://' + SERVER_STUDIO_USER + ':' + SERVER_STUDIO_PASSWORD + '@' + SERVER_STUDIO_IP + '/execute', 'command='+Command);
-    // Also works
-    // ShellExecuteHidden('curl', 'http://username:password@127.0.0.1:9300/execute?command='+Command);
 end;
 
 procedure RestToStudio1(Command: String);
 begin
-    if (STUDIO = 'studio1') then begin
+    if (STUDIO = 'STUDIO1') then begin
         WriteScriptDebug('Studio 1 trying to send REST command to itself. Aborting..');
         exit;
     end;
@@ -103,12 +127,11 @@ begin
     HTTPPost('http://' + STUDIO1_USER + ':' + STUDIO1_PASSWORD + '@' + STUDIO1_IP + '/execute', 'command='+Command);
 end;
 
-
 // mAirlist procedures
 procedure OnLoad;
 begin
     SystemLog('Loaded Studio Switcher Script');
-    GO_ON_AIR := False;
+    GO_ON_AIR := False; // TO Consider, maybe add this as a file, in case of script loading after variable is set to True?
 
     sl := TStringList.Create;
     try
@@ -138,85 +161,99 @@ end;
 
 procedure OnExecuteCommand(Command: string);
 begin
-    WriteScriptDebug(Command); 
+    ViewAllCommands(Command); 
     
     if Command = 'TOTH_CHECK' then begin
         WriteScriptDebug('Running TOTH checks..');
         GoOnAir();
         GoOffAir();
+        WriteScriptDebug(Command);
     end;
 
     if Command = 'GO_ON_AIR TRUE' then begin
         GO_ON_AIR := True;
         GO_OFF_AIR := False;
-        WriteScriptDebug('This Studio will go live at TOTH');
+        WriteLog('This Studio will go live next hour.');
+        WriteScriptDebug(Command);
     end;
 
     if Command = 'GO_ON_AIR FALSE' then begin
         GO_ON_AIR := False;
+        WriteScriptDebug(Command);
     end;
 
     if Command = 'GO_OFF_AIR TRUE' then begin
         GO_OFF_AIR := True;
         GO_ON_AIR := False;
-        WriteScriptDebug('This Studio will go off air next hour.');
+        WriteLog('This Studio will go off air next hour.');
+        WriteScriptDebug(Command);
     end;
 
     if Command = 'GO_OFF_AIR FALSE' then begin
         GO_OFF_AIR := False;
+        WriteScriptDebug(Command);
     end;
 
     if Command = 'DELAYED CLEAR' then begin
         StopStudio();
+        WriteScriptDebug(Command);
     end;
 
     if Command = 'MESSAGE_TO_SERVER' then begin
+        Sleep(2000);
         ShowMessage('Server studio will go on air next hour.');
+        WriteScriptDebug(Command);
     end;
 
     if Command = 'MESSAGE_TO_CURRENT' then begin
+        Sleep(2000);
         ShowMessage('This studio will go on air next hour.');
+        WriteScriptDebug(Command);
     end;
 
     if Command = 'CONFIRMATION_FROM_SERVER' then begin
         SystemLog('Confirmation from server. Going on air next hour');
         ShowMessage('Melding fra server: Bekrefter on air fra neste time.');
+        WriteScriptDebug(Command);
     end;
 
     if Command = 'TEST_REST' then begin
-        RestToStudio1('Halloen');
+        RestToStudio1('TESTET REST, STUDIO 1');
+        RestToServer('TESTET REST, SERVER');
     end;
-end;
 
-procedure OnSystemLog(Category: TLogCategory; Message: string);
-begin
-    i := pos(LOG_SEARCH_PHRASE, Message);
-    if (i >= 1) then begin
-        if (NTFY_ENDPOINT = '') then begin
-            SystemLog('No NTFY endpoint set, aborting.. ');
+    if Command = 'ACTIVATE_TOTH_BUTTON' then begin
+        if (STUDIO_ON_AIR_STATUS) then begin
+            WriteScriptDebug('Current studio is already on air. Aborting..');
+            ShowMessage('Current studio is already on air, aborting action.');
             exit;
-        end; 
-        ShellExecuteHidden('curl', '-d "' + Message + '" ' + NTFY_ENDPOINT);
+        end;
+        ExecuteCommand('GO_ON_AIR TRUE');
+        ExecuteCommand('MESSAGE_TO_CURRENT');
+        // TODO! Load Database Playlist(next hour)
+        RestToServer('GO_OFF_AIR TRUE');
+        WriteScriptDebug(Command);
     end;
+        
+    if Command = 'DEACTIVATE_TOTH_BUTTON' then begin
+        ExecuteCommand('GO_ON_AIR FALSE');
+        ExecuteCommand('GO_OFF_AIR TRUE');
+        ExecuteCommand('MESSAGE_TO_SERVER');
+        RestToServer('SERVER_TOTH_PRESS');
+        WriteScriptDebug(Command);
+    end;
+
+    if Command = 'SERVER_TOTH_PRESS' then begin
+        if not (STUDIO = 'SERVER') then begin
+            WriteScriptDebug('This node is not the server, aborting..');
+            exit;
+        end;
+        // TODO! Load Database playlist (next hour)
+        ExecuteCommand('GO_ON_AIR TRUE');
+        RestToStudio1('CONFIRMATION_FROM_SERVER');
+    end;
+
 end;
 
 begin    
 end.
-
-// TOTH Button RA
-// Button Activated
-// Execute GO_LIVE TRUE
-// Execute MESSAGE_TO_CURRENT
-// Load Database Playlist(next hour)
-// Execute REST to server : Go Offair True
-
-// Button Deactivated
-// Execute GO_LIVE False
-// Execute GO_OFFAIR True
-// Execute MESSAGE_TO_SERVER
-// REST VIRTUALSTUDIO TOTH PRESS
-
-
-// Nettradioen (if VIRTUALSTUDIO TOTH PRESS)
-// Load Database playlist (next hour)
-// Execute GO_Live True
