@@ -7,6 +7,10 @@ const
     DEBUG = True;    // Set to false in production
     LOGGING = True;
 
+    SERVER_STUDIO_IP = '127.0.0.1:9300'; // Change to your IP and port
+    SERVER_STUDIO_USER = 'thomas';
+    SERVER_STUDIO_PASSWORD = 'thomas';
+
 var
     i: integer;
     GO_ON_AIR: boolean;
@@ -29,7 +33,6 @@ begin
         SystemLog('Studio Switcher Debug: ' + message);
     end;
 end;
-
 
 procedure StopStudio;
 begin
@@ -65,7 +68,10 @@ end;
 
 procedure RestToServer(Command: String);
 begin
-    HTTPPost('http://thomas:thomas@10.0.0.100:9300', 'command=HALLO');
+    HTTPPost('http://' + SERVER_STUDIO_USER + ':' + SERVER_STUDIO_PASSWORD + '@' + SERVER_STUDIO_IP + '/execute', 'command='+Command);
+
+    // Also works
+    // ShellExecuteHidden('curl', 'http://username:password@127.0.0.1:9300/execute?command='+Command);
 end;
 
 // mAirlist procedures
@@ -135,9 +141,8 @@ begin
     end;
 
     if Command = 'TEST_REST' then begin
-        RestToServer('COMMAND HER')
+        RestToServer('ON/OFF AIR')
     end;
-
 end;
 
 begin    
