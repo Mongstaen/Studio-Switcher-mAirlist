@@ -42,7 +42,7 @@ begin
     end;
 end;
 
-procedure GoOffAirTOTH;
+procedure GoOffAir;
 begin
     if(GO_OFF_AIR) then begin
         WriteLog('GO OFF AIR');
@@ -88,7 +88,7 @@ begin
     if Command = 'TOTH_CHECK' then begin
         WriteScriptDebug('Running TOTH checks..');
         GoOnAir();
-        GoOffAirTOTH();
+        GoOffAir();
     end;
 
     if Command = 'GO_ON_AIR TRUE' then begin
