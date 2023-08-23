@@ -30,6 +30,16 @@ begin
     end;
 end;
 
+
+procedure StopStudio;
+begin
+    ExecuteCommand('ENCODER DISCONNECT');
+    ExecuteCommand('AUTOMATION 1 OFF');
+    Sleep(2000); 
+    ExecuteCommand('PLAYLIST 1 CLEAR');
+end;
+
+
 procedure GoOnAir;
 begin
     if(GO_ON_AIR) then begin
@@ -53,17 +63,9 @@ begin
     end;
 end;
 
-procedure StopStudio;
+procedure RestToServer(Command: String);
 begin
-    ExecuteCommand('ENCODER DISCONNECT');
-    ExecuteCommand('AUTOMATION 1 OFF');
-    Sleep(2000); 
-    ExecuteCommand('PLAYLIST 1 CLEAR');
-end;
-
-procedure RestToServer(Command);
-begin
-    HTTPPost('http://user:password@<IP-address>:<port>', 'command='Command);
+    HTTPPost('http://thomas:thomas@10.0.0.100:9300', 'command=HALLO');
 end;
 
 // mAirlist procedures
