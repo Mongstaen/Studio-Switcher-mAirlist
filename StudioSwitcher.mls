@@ -7,15 +7,24 @@ const
     DEBUG = True;    // Set to false in production
     LOGGING = True;
 
+    // Your serverstudio/virtual studio
     SERVER_STUDIO_IP = '127.0.0.1:9300'; // Change to your IP and port
     SERVER_STUDIO_USER = 'thomas';
     SERVER_STUDIO_PASSWORD = 'thomas';
+
+    // Your main studio
+    STUDIO1_IP = '127.0.0.1:9300'; // Change to your IP and port
+    STUDIO1_USER = 'thomas';
+    STUDIO1_PASSWORD = 'thomas';
 
 var
     i: integer;
     GO_ON_AIR: boolean;
     GO_OFF_AIR: boolean;
     STUDIO_ON_AIR_STATUS: boolean;
+
+    sl: TStringList;
+    STUDIO: string;
 
 // Custom procedures
 procedure WriteLog(message: String);
@@ -40,6 +49,7 @@ begin
     ExecuteCommand('AUTOMATION 1 OFF');
     Sleep(2000); 
     ExecuteCommand('PLAYLIST 1 CLEAR');
+    GO_ON_AIR := False;
 end;
 
 
@@ -68,17 +78,45 @@ end;
 
 procedure RestToServer(Command: String);
 begin
-    HTTPPost('http://' + SERVER_STUDIO_USER + ':' + SERVER_STUDIO_PASSWORD + '@' + SERVER_STUDIO_IP + '/execute', 'command='+Command);
+    if (STUDIO = 'server') then begin
+        WriteScriptDebug('Server studio trying to send REST command to itself. Aborting..');
+        exit;
+    end;
 
+    HTTPPost('http://' + SERVER_STUDIO_USER + ':' + SERVER_STUDIO_PASSWORD + '@' + SERVER_STUDIO_IP + '/execute', 'command='+Command);
     // Also works
     // ShellExecuteHidden('curl', 'http://username:password@127.0.0.1:9300/execute?command='+Command);
 end;
+
+procedure RestToStudio1(Command: String);
+begin
+    if (STUDIO = 'studio1') then begin
+        WriteScriptDebug('Studio 1 trying to send REST command to itself. Aborting..');
+        exit;
+    end;
+
+    HTTPPost('http://' + STUDIO1_USER + ':' + STUDIO1_PASSWORD + '@' + STUDIO1_IP + '/execute', 'command='+Command);
+end;
+
 
 // mAirlist procedures
 procedure OnLoad;
 begin
     SystemLog('Loaded Studio Switcher Script');
     GO_ON_AIR := False;
+
+    sl := TStringList.Create;
+    try
+        // From C:/Program Files/Mairlist directory
+        sl.LoadFromFile('node.txt');
+        STUDIO := sl[0];
+        WriteScriptDebug('Current node is '+STUDIO);
+    except
+        WriteScriptDebug('Could not read node.txt file');
+        
+    finally
+        sl.Free;
+    end;
 end;
 
 procedure OnOnAir;
@@ -135,15 +173,33 @@ begin
         ShowMessage('This studio will go on air next hour.');
     end;
 
-    if Command = 'CONFIRMATION_FROM_VIRTUALSTUDIO' then begin
-        SystemLog('Confirmation from virtual studio. Going live at TOTH!');
+    if Command = 'CONFIRMATION_FROM_SERVER' then begin
+        SystemLog('Confirmation from server. Going on air next hour');
         ShowMessage('Melding fra server: Bekrefter on air fra neste time.');
     end;
 
     if Command = 'TEST_REST' then begin
-        RestToServer('ON/OFF AIR')
+        RestToStudio1('Halloen');
     end;
 end;
 
 begin    
 end.
+
+// TOTH Button RA
+// Button Activated
+// Execute GO_LIVE TRUE
+// Execute MESSAGE_TO_CURRENT
+// Load Database Playlist(next hour)
+// Execute REST to server : Go Offair True
+
+// Button Deactivated
+// Execute GO_LIVE False
+// Execute GO_OFFAIR True
+// Execute MESSAGE_TO_SERVER
+// REST VIRTUALSTUDIO TOTH PRESS
+
+
+// Nettradioen (if VIRTUALSTUDIO TOTH PRESS)
+// Load Database playlist (next hour)
+// Execute GO_Live True
