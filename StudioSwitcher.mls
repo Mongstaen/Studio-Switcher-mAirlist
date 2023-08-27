@@ -135,7 +135,7 @@ begin
 
     sl := TStringList.Create;
     try
-        // From C:/Program Files/Mairlist directory
+        // From C:/Program Files (x86)/Mairlist directory
         sl.LoadFromFile('node.txt');
         STUDIO := sl[0];
         WriteScriptDebug('Current node is '+STUDIO);
