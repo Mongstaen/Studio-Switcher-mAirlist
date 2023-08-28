@@ -226,11 +226,15 @@ begin
         if (STUDIO_ON_AIR_STATUS) then begin
             WriteScriptDebug('Current studio is already on air. Aborting..');
             ShowMessage('Current studio is already on air, aborting action.');
+            
+            ExecuteCommand('GO_OFF_AIR FALSE');
             exit;
         end;
         ExecuteCommand('GO_ON_AIR TRUE');
         ExecuteCommand('MESSAGE_TO_CURRENT');
         // TODO! Load Database Playlist(next hour)
+        // For now, created a hidden button..
+        ExecuteCommand('LOAD_PLAYLIST PRESS');
         RestToServer('GO_OFF_AIR TRUE');
         WriteScriptDebug(Command);
     end;
@@ -248,7 +252,9 @@ begin
             WriteScriptDebug('This node is not the server, aborting..');
             exit;
         end;
-        // TODO! Load Database playlist (next hour)
+        // TODO! Load Database Playlist(next hour)
+        // For now, created a hidden button..
+        ExecuteCommand('LOAD_PLAYLIST PRESS');
         ExecuteCommand('GO_ON_AIR TRUE');
         RestToStudio1('CONFIRMATION_FROM_SERVER');
     end;
