@@ -1,0 +1,255 @@
+//////////////////////////////////
+// Studio Switcher Script V2.1 ///
+// Written by Thomas Mongstad  ///
+//////////////////////////////////
+
+const  
+    DEBUG =                 True;  // Set to false in production
+    LOGGING =               True;   // Reccomending true in production
+    VIEW_ALL_COMMANDS =     False;  // Set to false in production. Logs all executed commands to SystemLog
+
+    // Edit this value corresponding to number of studios set in SetStudioConfig
+    NumberOfStudios = 2;
+
+    SaveLocationTMP = 'Z:\tmp.mlp'; // Set to a location all studios have access to.. 
+    NodeLocation = 'C:\node.txt'; // One node.txt per studio, content must match whatever set in SetStudioConfig below. 
+
+var
+    i,j:                    integer;
+    GO_ON_AIR_NOW:          boolean;
+    GO_OFF_AIR_NOW:         boolean;
+
+    sl:                     TStringList;
+    STUDIO:                 string;
+
+    StudioConfig: array[1..NumberOfStudios] of array[0..3] of string;
+
+// Custom procedures
+    procedure SetStudioConfig();
+        begin
+            // Server Setup
+            StudioConfig[1][0] := 'SERVER'; // Server node name
+            StudioConfig[1][1] := '127.0.0.1:9300'; // Server IP and port
+            StudioConfig[1][2] := ''; // Server username
+            StudioConfig[1][3] := ''; // Server password
+
+            // Studio 1 Setup
+            StudioConfig[2][0] := 'STUDIO1'; // Node Name
+            StudioConfig[2][1] := '127.0.0.1:9300'; // IP and Port
+            StudioConfig[2][2] := ''; // Username
+            StudioConfig[2][3] := ''; // Password
+        end;
+// Logging
+    procedure WriteLog(message: String);
+        begin
+            if (LOGGING) then
+            begin
+                SystemLog(STUDIO + ' Studio Switcher Log: ' + message);
+            end;
+        end;
+
+    procedure WriteScriptDebug(message: String);
+        begin
+            if (DEBUG) then
+            begin
+                SystemLog(STUDIO + ' Studio Switcher Debug: ' + message);
+            end;
+        end;
+
+    procedure ViewAllCommands(message: String);
+    begin
+        if (VIEW_ALL_COMMANDS) then
+        begin
+            SystemLog(STUDIO + ' Command Viewer: ' + message);
+        end;
+    end;
+
+// REST destinations
+    procedure RestToServer(Command: String);
+        begin
+            for i := 1 to NumberOfStudios do 
+            begin
+                if(StudioConfig[i][0] = STUDIO) then Continue;
+                if not (StudioConfig[i][0] = 'SERVER') then Continue;
+                SystemLog('http://' + StudioConfig[i][2] + ':' + StudioConfig[i][3] + '@' + StudioConfig[i][1] + '/execute command='+Command);
+                HTTPPost('http://' + StudioConfig[i][2] + ':' + StudioConfig[i][3] + '@' + StudioConfig[i][1] + '/execute', 'command='+Command);
+            end;
+        end;
+
+    procedure RestToStudio1(Command: String);
+        begin
+            for i := 1 to NumberOfStudios do 
+            begin
+                if(StudioConfig[i][0] = STUDIO) then Continue;
+                if not (StudioConfig[i][0] = 'STUDIO1') then Continue;
+                HTTPPost('http://' + StudioConfig[i][2] + ':' + StudioConfig[i][3] + '@' + StudioConfig[i][1] + '/execute', 'command='+Command);
+            end;
+        end;
+    
+    procedure RestToStudio2(Command: String);
+        begin
+            for i := 1 to NumberOfStudios do 
+            begin
+                if(StudioConfig[i][0] = STUDIO) then Continue;
+                if not (StudioConfig[i][0] = 'STUDIO2') then Continue;
+                HTTPPost('http://' + StudioConfig[i][2] + ':' + StudioConfig[i][3] + '@' + StudioConfig[i][1] + '/execute', 'command='+Command);
+            end;
+        end;
+    
+    procedure RestToAll(Command: String);
+        begin
+            for i := 1 to NumberOfStudios do 
+            begin
+                if(StudioConfig[i][0] = STUDIO) then Continue;
+                HTTPPost('http://' + StudioConfig[i][2] + ':' + StudioConfig[i][3] + '@' + StudioConfig[i][1] + '/execute', 'command='+Command);
+            end;
+        end;
+
+procedure ItemStoppedCheck();
+    begin
+        if (GO_OFF_AIR_NOW) then begin
+            Sleep(1000); 
+            ExecuteCommand('OFF AIR');
+            ExecuteCommand('AUTOMATION 1 OFF');
+            ExecuteCommand('AUTOMATION 1 STOP');
+            Sleep(2000); 
+            ExecuteCommand('PLAYLIST 1 CLEAR');
+            ExecuteCommand('GO_OFF_AIR_NOW FALSE');
+        end;
+
+        if (GO_ON_AIR_NOW) then begin
+            Sleep(2000); 
+            ExecuteCommand('AUTOMATION 1 ON');
+            ExecuteCommand('ON AIR');
+            Sleep(500);
+            ExecuteCommand('AUTOMATION 1 PLAY');
+            ExecuteCommand('GO_ON_AIR_NOW FALSE');
+        end;
+    end;
+
+procedure ExportPlaylist();
+    begin
+        if (Instance.GetOnAir = False ) then begin
+            WriteLog('This node is off air, aborting export of playlist.');
+            exit;
+        end;
+        CurrentPlaylist.SaveToFile(SaveLocationTMP);
+        WriteLog('Exported current playlist.');
+    end;
+
+procedure ImportPlaylist();
+    begin
+        if (Instance.GetOnAir = True ) then begin
+            WriteLog('This node is on air, aborting import of playlist.');
+            exit;
+        end;
+        ExecuteCommand('PLAYLIST 1 LOAD ' + SaveLocationTMP);
+        Sleep(1000);
+        ExecuteCommand('PLAYLIST 1 CURSOR DOWN');
+        Sleep(500);
+        ExecuteCommand('PLAYLIST 1 DELETE');
+    end;
+
+// mAirlist procedures
+procedure OnLoad;
+    begin
+        SystemLog('Loaded Studio Switcher Script');
+        GO_ON_AIR_NOW := False; // TO Consider, maybe add this as a file, in case of script loading after variable is set to True?
+
+        // Initialize Studio Configuration
+        SetStudioConfig();
+
+        // Check Node Name
+        sl := TStringList.Create;
+        try
+            sl.LoadFromFile(NodeLocation);
+            STUDIO := sl[0];
+            WriteScriptDebug('Current node is '+STUDIO);
+        except
+            WriteScriptDebug('Could not read node.txt file');
+        finally
+            sl.Free;
+        end;
+    end;
+
+procedure OnItemStop(Item: IPlaylistItem; Region: byte; OnAir: boolean; UniqueID: string; Duration: TTimeValue);
+    begin
+        if not (GO_OFF_AIR_NOW) then begin
+            exit;
+        end;
+        RestToAll('ITEM_STOPPED_CHECK');
+        ExecuteCommand('ITEM_STOPPED_CHECK');
+    end;
+
+procedure OnExecuteCommand(Command: string);
+    begin
+        ViewAllCommands(Command); 
+
+        if Command = 'GO_ON_AIR_NOW TRUE' then begin
+            GO_ON_AIR_NOW := True;
+            GO_OFF_AIR_NOW := False;
+            WriteLog('This Studio will go on air after next item.');
+            WriteScriptDebug(Command);
+        end;
+
+        if Command = 'GO_ON_AIR_NOW FALSE' then begin
+            GO_ON_AIR_NOW := False;
+            WriteScriptDebug(Command);
+        end;
+
+        if Command = 'GO_OFF_AIR_NOW TRUE' then begin
+            GO_OFF_AIR_NOW := True;
+            GO_ON_AIR_NOW := False;
+            WriteLog('This Studio will go off air after this item.');
+            WriteScriptDebug(Command);
+        end;
+
+        if Command = 'GO_OFF_AIR_NOW FALSE' then begin
+            GO_OFF_AIR_NOW := False;
+            WriteScriptDebug(Command);
+        end;
+
+        if Command = 'ITEM_STOPPED_CHECK' then begin
+            ItemStoppedCheck();
+        end;
+
+        if Command = 'EXPORT_PLAYLIST' then begin
+            ExportPlaylist();
+        end;
+        if Command = 'IMPORT_PLAYLIST' then begin
+            ImportPlaylist();
+        end;
+
+        // Go on air with this studio.. 
+        if Command = 'ACTIVATE_SWITCH_BUTTON' then begin
+            if ( Instance.GetOnAir = True ) then begin
+                WriteScriptDebug('Current studio is already on air. Aborting..');
+                ShowMessage('Current studio is already on air, aborting action.');
+                ExecuteCommand('GO_OFF_AIR_NOW FALSE');
+                exit;
+            end;
+            ShowMessage('Playing last item at the server. This studio will take over automatically.');
+            RestToAll('EXPORT_PLAYLIST');
+            RestToAll('AUTOMATION 1 OFF');
+            Sleep(1000);
+            ImportPlaylist();
+            ExecuteCommand('GO_ON_AIR_NOW TRUE');
+            RestToAll('GO_OFF_AIR_NOW TRUE');
+            WriteScriptDebug(Command);
+        end;
+
+        // Go on air with server   
+        if Command = 'DEACTIVATE_SWITCH_BUTTON' then begin
+            ExportPlaylist();
+            ExecuteCommand('GO_OFF_AIR_NOW TRUE');
+            ExecuteCommand('AUTOMATION 1 OFF');
+            ShowMessage('Playing last item at this studio. Server will take over automatically, but please check your remove viewer.');
+            Sleep(1000);
+            RestToServer('IMPORT_PLAYLIST');
+            RestToServer('GO_ON_AIR_NOW TRUE');
+            WriteScriptDebug(Command);
+        end;
+    end;
+
+begin    
+end.
